@@ -130,10 +130,9 @@ constraint_model = None
 # If you want to use wandb, please replace project and entity with yours.
 if argv.wandb:
     wandb.init(
-        project='mapdn_model-based',
-        entity="chelly",
+        project='T-MAAC',
         name=log_name,
-        group='_'.join(log_name.split('_')[:-1]),
+        group=log_name.split('_')[2] +'-'+ log_name.split('_')[-1],
         save_code=True
     )
     wandb.config.update(env_config_dict)
