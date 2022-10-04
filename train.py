@@ -9,7 +9,7 @@ from environments.var_voltage_control.voltage_control_env import VoltageControl
 from utilities.util import convert, dict2str
 from utilities.trainer import PGTrainer
 import wandb
-from transition.model import transition_model, transition_model_linear
+# from transition.model import transition_model, transition_model_linear
 
 parser = argparse.ArgumentParser(description="Train rl agent.")
 parser.add_argument("--save-path", type=str, nargs="?", default="./",
@@ -32,7 +32,7 @@ parser.add_argument("--season", type=str, nargs="?",
                     default="all", help="all/summer/winter")
 # parser.add_argument("--date-emb",  action='store_true')
 # parser.add_argument("--safe-trans",  action='store_true')
-parser.add_argument("--wandb",  action='store_true')
+parser.add_argument("--wandb",  action='store_false')
 parser.add_argument("--gpuid",type = int,default = 0,
                     help = "GPU id")
 # parser.add_argument("--safe", type=str, nargs="?",
@@ -41,8 +41,8 @@ parser.add_argument("--gpuid",type = int,default = 0,
 #                     nargs="?", default="transition/case322_3min_final.lin_model")
 argv = parser.parse_args()
 
-if torch.cuda.is_available():
-    torch.cuda.set_device(argv.gpuid)
+if th.cuda.is_available():
+    th.cuda.set_device(argv.gpuid)
 
 # load env args
 with open("./args/env_args/"+argv.env+".yaml", "r") as f:

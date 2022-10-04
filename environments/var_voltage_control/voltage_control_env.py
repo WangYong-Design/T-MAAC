@@ -283,7 +283,7 @@ class VoltageControl(MultiAgentEnv):
         if self.args.mode == "distributed":
             obs_zone_dict = list()
             zone_list = list()
-            self.obs_dim = 7
+            self.obs_dim = 4
             obs_len_list = list()
             agent_index_in_obs = list()
             self.obs_bus_num = []
@@ -318,9 +318,9 @@ class VoltageControl(MultiAgentEnv):
                 idx = list(zone_buses.index).index(sgen_bus)
                 pv_list[idx] = pv
                 q_list[idx] = q
-                obs += list(pv_flag)
-                obs += list(pv_list)
-                obs += list(q_list)
+                # obs += list(pv_flag)
+                # obs += list(pv_list)
+                # obs += list(q_list)
                 obs_zone_dict.append(np.array(obs).reshape(self.obs_dim, -1).transpose().reshape(-1))
                 obs_len_list.append(len(obs))
 
