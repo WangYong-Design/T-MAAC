@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["--alg","icstransmaddpg","--alias","example_0","--mode","distributed","--scenario","case322_3min_final",
-                    "--qweight","0.01","--voltage-barrier-type","l2","--save-path","trial"]  
+                     "--qweight","0.01","--voltage-barrier-type","l2","--save-path","trial"]  
         }
     ]
 }

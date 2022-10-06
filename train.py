@@ -148,6 +148,7 @@ if argv.save_path[-1] is "/":
 else:
     save_path = argv.save_path+"/"
 
+
 # create the save folders
 if "model_save" not in os.listdir(save_path):
     os.mkdir(save_path + "model_save")
@@ -171,6 +172,10 @@ model = Model[argv.alg]
 
 strategy = Strategy[argv.alg]
 
+# LOAD_MODEL_PATH = save_path + "model_save/"+log_name+"/model.pt"
+# checkout = th.load(LOAD_MODEL_PATH,map_location="cpu") if not th.cuda.is_available() else th.load(LOAD_MODEL_PATH)
+# model.load_state_dict(checkout["model_state_dict"])
+
 print(f"{args}\n")
 
 if strategy == "pg":
@@ -179,6 +184,8 @@ elif strategy == "q":
     raise NotImplementedError("This needs to be implemented.")
 else:
     raise RuntimeError("Please input the correct strategy, e.g. pg or q.")
+
+# train.behaviour_net.load_state_dict(checkout["model_state_dict"])
 
 with open(save_path + "tensorboard/" + log_name + "/log.txt", "w+") as file:
     alg_args2str = dict2str(alg_config_dict, 'alg_params')

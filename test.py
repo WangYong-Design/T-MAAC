@@ -2,6 +2,7 @@ import torch
 import argparse
 import yaml
 import pickle
+import wandb
 
 from models.model_registry import Model, Strategy
 from environments.var_voltage_control.voltage_control_env import VoltageControl
@@ -51,7 +52,13 @@ parser.add_argument("--test-day", type=int, nargs="?", default=199,
                     help="Please input the day you would test if the test mode is single.")
 parser.add_argument("--render", action="store_true",
                     help="Activate the rendering of the environment.")
+parser.add_argument("--gpuid",type=int,default = 0,help="gpu id")
+parser.add_argument("--wandb", action="store_false",
+                    help="Use wandb or not.")
 argv = parser.parse_args()
+
+if torch.cuda.is_available():
+    torch.cuda.set_device(argv.gpuid)
 
 # load env args
 with open("./args/env_args/"+argv.env+".yaml", "r") as f:
@@ -102,6 +109,18 @@ with open("./args/alg_args/"+argv.alg+".yaml", "r") as f:
 log_name = "-".join([argv.env, net_topology, argv.mode,
                     argv.alg, argv.voltage_barrier_type, argv.alias])
 alg_config_dict = {**default_config_dict, **alg_config_dict}
+
+# If you want to use wandb, please replace project and entity with yours.
+if argv.wandb:
+    wandb.init(
+        project='test_T-MAAC',
+        name=log_name,
+        group=log_name.split('_')[2] +'-'+ log_name.split('_')[-1],
+        save_code=True
+    )
+    wandb.config.update(env_config_dict)
+    wandb.config.update(alg_config_dict)
+    wandb.run.log_code('.')
 
 # define envs
 env = VoltageControl(env_config_dict)

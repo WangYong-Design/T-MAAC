@@ -2,6 +2,7 @@ import torch as th
 from utilities.util import translate_action, prep_obs
 import numpy as np
 import time
+import wandb
 
 
 class PGTester(object):
@@ -150,6 +151,8 @@ class PGTester(object):
         for month in range(1, 13):
             for k, v in test_results[month].items():
                 test_results[month][k] = (np.mean(v), 2 * np.std(v))
+                wandb.log({k+"mean":np.mean(v),
+                            k+"std":2*np.std(v)},month)
         self.print_info(test_results, True)
         return test_results
 
