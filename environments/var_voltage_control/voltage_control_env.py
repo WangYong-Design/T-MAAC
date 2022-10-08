@@ -12,6 +12,7 @@ from .voltage_barrier.voltage_barrier_backend import VoltageBarrier
 
 from datetime import datetime
 import pandapower.topology as top
+import networkx as nx
 
 def convert(dictionary):
     return namedtuple('GenericDict', dictionary.keys())(**dictionary)
@@ -110,7 +111,8 @@ class VoltageControl(MultiAgentEnv):
         # initialise voltage barrier function
         self.voltage_barrier = VoltageBarrier(self.voltage_loss_type)
         self._rendering_initialized = False
-
+        self._cal_agents_topo()
+        print(1)
 
 
 
@@ -840,7 +842,21 @@ class VoltageControl(MultiAgentEnv):
                     if end_index in dist_index:
                         adj[i][j]=1
             self.adj.append(adj)
-
+    
+    def _cal_agents_topo(self):
+        n = self.get_num_of_agents()
+        self.topology = top.create_nxgraph(self.powergrid)
+        shortest_path = []
+        self.agent_lca = {}
+        for i in range(n):
+            shortest_path.append(nx.shortest_path(self.topology,0,self.powergrid.sgen.loc[i,"bus"]))
+        
+        for i in range(n):
+            self.agent_lca[i] = []
+            for j in range(n): 
+                lca_nodes = list(set(shortest_path[i])&set(shortest_path[j]))
+                lca_nodes.sort(key = shortest_path[i].index)
+                self.agent_lca[i].append(lca_nodes)
 
     def get_constraint_mask(self):
         return self.mask
