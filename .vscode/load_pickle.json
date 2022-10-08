@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--alg","icstransmaddpg","--alias","example_0","--mode","distributed","--scenario","case322_3min_final",
+                     "--voltage-barrier-type","l2","--save-path","test_record"]  
+        }
+    ]
+}

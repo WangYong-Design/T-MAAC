@@ -128,6 +128,7 @@ class PGTester(object):
                     action, _, _, _, hid = self.behaviour_net.get_actions(state_, status='test', exploration=False, actions_avail=th.tensor(
                         self.env.get_avail_actions()), target=False, last_hid=last_hid)
                 _, actual = translate_action(self.args, action, self.env)
+                actual = np.zeros(self.n_)
                 reward, done, info = self.env.step(actual, add_noise=False)
                 done_ = done or t == self.args.max_steps-1
                 next_state = self.env.get_obs()
@@ -151,8 +152,8 @@ class PGTester(object):
         for month in range(1, 13):
             for k, v in test_results[month].items():
                 test_results[month][k] = (np.mean(v), 2 * np.std(v))
-                wandb.log({k+"mean":np.mean(v),
-                            k+"std":2*np.std(v)},month)
+                wandb.log({k+"_mean":np.mean(v),
+                            k+"_std":2*np.std(v)},month)
         self.print_info(test_results, True)
         return test_results
 

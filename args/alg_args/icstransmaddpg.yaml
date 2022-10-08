@@ -11,7 +11,7 @@ alg_args:
     "encoder": True
     "encoder_lrate": 1.0e-5 # for encoder in critic
     "attend_heads": 4
-    "n_layers": 1
+    "n_layers": 3
     "pretrained": null # None / encoder.pth
 
     # for actor encoder

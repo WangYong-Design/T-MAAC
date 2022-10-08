@@ -1,7 +1,4 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
@@ -11,8 +8,71 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--alg","icstransmaddpg","--alias","example_0","--mode","distributed","--scenario","case322_3min_final",
-                     "--qweight","0.01","--voltage-barrier-type","l2","--save-path","trial"]  
+            "args": [
+                "--alg",
+                "icstransmaddpg",
+                "--alias",
+                "example_0",
+                "--mode",
+                "distributed",
+                "--scenario",
+                "case322_3min_final",
+                "--qweight",
+                "0.1",
+                "--voltage-barrier-type",
+                "l2",
+                "--save-path",
+                "trial"
+            ]
         }
     ]
 }
+
+// Configurations for pickle draw wandb
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python: Current File",
+//             "type": "python",
+//             "request": "launch",
+//             "program": "${file}",
+//             "console": "integratedTerminal",
+//             "justMyCode": true,
+//             "args": ["--alg","icstransmaddpg","--alias","ori","--mode","distributed","--scenario","case322_3min_final",
+//                      "--voltage-barrier-type","l2","--save-path","test_record"]  
+//         }
+//     ]
+// }
+
+// Configurations for test
+
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python: Current File",
+//             "type": "python",
+//             "request": "launch",
+//             "program": "${file}",
+//             "console": "integratedTerminal",
+//             "justMyCode": true,
+//             "args": [
+//                 "--alg",
+//                 "icstransmaddpg",
+//                 "--alias",
+//                 "ori",
+//                 "--test-mode",
+//                 "test_data",
+//                 "--scenario",
+//                 "case322_3min_final",
+//                 "--qweight",
+//                 "0.1",
+//                 "--voltage-barrier-type",
+//                 "l2",
+//                 "--save-path",
+//                 "trial/model_save"
+//             ]
+//         }
+//     ]
+// }
