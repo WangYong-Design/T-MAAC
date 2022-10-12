@@ -162,7 +162,7 @@ def prep_obs(state=[]):
     if len(state.shape) == 2:
         state = np.stack(state, axis=0)
     # for single episode
-    elif len(state.shape) == 4:
+    elif len(state.shape) == 4 or len(state.shape) == 5:
         state = np.concatenate(state, axis=0)
     else:
         raise RuntimeError('The shape of the observation is incorrect.')

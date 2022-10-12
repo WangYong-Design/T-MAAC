@@ -20,11 +20,13 @@ alg_args:
     "auxiliary_lrate": 1.0e-5 # encoder_lrate = auxiliary_lrate
 
     # for critic
-    "critic_type": "transformer" # "transformer" "mlp"
+    "critic_type": "graph_transformer" # "graph_transformer" "transformer" "mlp"
     "critic_encoder": False
     "use_emb": "glimpsed" # "glimpsed" or "mean"
     "value_grad": True
     "merge_act": False
+    "dropout": 0.3
+    "norm_type": "batchnorm"
 
     # for cost (not used)
     "cost_loss": False
@@ -37,3 +39,5 @@ alg_args:
     "lambda_lrate": 5.0e-5
     "upper_bound": 0.
     "cost_gamma": 0.
+
+

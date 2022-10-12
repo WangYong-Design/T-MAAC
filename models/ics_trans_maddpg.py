@@ -7,6 +7,7 @@ from utilities.util import select_action
 from models.model import Model
 from critics.mlp_critic import MLPCritic
 from transformer.transformer_critic_ex import TransformerCritic
+from transformer.graph_transformer_critic import graphtransformer
 from transformer.transformer_encoder_adj import TransformerEncoder
 
 class ICSTRANSMADDPG(Model):
@@ -78,6 +79,9 @@ class ICSTRANSMADDPG(Model):
             input_shape = ( self.obs_dim + self.act_dim ) * self.n_
             output_shape = 1
             self.value_dicts = nn.ModuleList([MLPCritic(input_shape, output_shape, self.args)])
+        elif self.args.critic_type == "graph_transformer":
+            input_shape = self.obs_bus_dim + self.act_dim
+            self.value_dicts = nn.ModuleList([graphtransformer(input_shape,self.args)])
         else:
             NotImplementedError()
 
@@ -145,39 +149,26 @@ class ICSTRANSMADDPG(Model):
 
         return means, log_stds, hiddens
 
-    def value(self, obs, act):
-        # obs_shape = (b, n, o)
+    def value(self, nodes_feats,edges_feats, act):
+        # nodes_shape = (b,n,obs_dim)
+        # edges_shape = (b,n,n,obs_dim)
         # act_shape = (b, n, a)
-        batch_size = obs.size(0)
-        if self.args.critic_encoder:
-            if self.args.value_grad:
-                emb_agent_glimpsed, _, emb = self.encode(obs)
-            else:
-                with th.no_grad():
-                    emb_agent_glimpsed, _, emb = self.encode(obs)
 
-            if self.args.use_emb == "glimpsed":
-                obs = emb_agent_glimpsed
-            elif self.args.use_emb == "mean":
-                obs = emb
-            else:
-                NotImplementedError()
+        batch_size = nodes_feats.size(0)
+        nodes_feats = nodes_feats.contiguous()
+        edges_feats = edges_feats.contiguous()
+        act_reshape = act.contiguous()
 
-            obs_reshape = obs.view(batch_size, self.n_, -1).contiguous()
-            act_reshape = act.contiguous()
-            inputs = th.cat( (obs_reshape, act_reshape), dim=-1 )   # (b, n, h+a)
+        inputs = th.cat((nodes_feats,act_reshape),dim = -1)  # (b, n, o+a)
 
-        else:
-            obs_reshape = obs.contiguous()
-            act_reshape = act.contiguous()
-            inputs = th.cat( (obs_reshape, act_reshape), dim=-1 )   # (b, n, o+a)
-            if self.args.critic_type == "mlp":
-                inputs = inputs.view(batch_size, -1)
+        if self.args.critic_type == "mlp":
+            inputs = inputs.view(batch_size, -1)
 
         if self.args.shared_params:
             agent_value = self.value_dicts[0]
-            values, costs = agent_value(inputs)
-            values = values.contiguous().unsqueeze(dim=-1).repeat(1, self.n_, 1).view(batch_size, self.n_, 1)
+            values, costs = agent_value(inputs,edges_feats)
+            # values = values.contiguous().unsqueeze(dim=-1).repeat(1, self.n_, 1).view(batch_size, self.n_, 1)
+            
             if self.args.critic_type == "mlp":
                 costs = th.zeros_like(values)
             costs = costs.contiguous().view(batch_size, self.n_, 1)
@@ -210,18 +201,24 @@ class ICSTRANSMADDPG(Model):
 
     def get_loss(self, batch):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, cost, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        state, agents_feats,edges_feats,actions, old_log_prob_a, old_values, old_next_values, rewards, cost, next_state,\
+        next_agents_feats,next_edges_feats,done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        
         _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
         if self.args.double_q:
             _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=hids)
         else:
             _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=True, last_hid=hids)
-        compose = self.value(state, actions_pol)
+        
+        compose = self.value(agents_feats,edges_feats, actions_pol)
         values_pol, costs_pol = compose[0].contiguous().view(-1, self.n_), compose[1].contiguous().view(-1, self.n_)
-        compose = self.value(state, actions)
+        
+        compose = self.value(agents_feats,edges_feats, actions)
         values, costs = compose[0].contiguous().view(-1, self.n_), compose[1].contiguous().view(-1, self.n_)
-        compose = self.target_net.value(next_state, next_actions.detach())
+        
+        compose = self.target_net.value(next_agents_feats,next_edges_feats, next_actions.detach())
         next_values, next_costs = compose[0].contiguous().view(-1, self.n_), compose[1].contiguous().view(-1, self.n_)
+        
         returns, cost_returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device), th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
         assert values_pol.size() == next_values.size()
         assert returns.size() == values.size()
@@ -248,8 +245,9 @@ class ICSTRANSMADDPG(Model):
 
     def get_auxiliary_loss(self, batch):
         batch_size = len(batch.state)
-        state, actions, old_log_prob_a, old_values, old_next_values, rewards, cost, next_state, done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
-
+        state, agents_feats,edges_feats,actions, old_log_prob_a, old_values, old_next_values, rewards, cost, next_state,\
+        next_agents_feats,next_edges_feats,done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        
         obs = state.view(batch_size, self.n_, self.obs_bus_num, self.obs_bus_dim).contiguous() # (b*n, self.obs_bus_num, self.obs_bus_dim)
         with th.no_grad():
             label = self._cal_out_of_control(obs.view(batch_size*self.n_, self.obs_bus_num, self.obs_bus_dim))

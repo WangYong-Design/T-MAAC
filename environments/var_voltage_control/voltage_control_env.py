@@ -100,20 +100,18 @@ class VoltageControl(MultiAgentEnv):
         self.region = np.unique(self.base_powergrid.bus['zone'].to_numpy(copy=True))
         self.region = np.append(self.region, 'all')
         self._cal_mask()
+        self._cal_agents_topo()
         agents_obs, state = self.reset()
         self._cal_adj_matrix()
 
         self.obs_size = agents_obs[0].shape[0]
-        self.state_size = state.shape[0]
+        self.state_size = state[0].shape[0]
         self.last_v = self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True)
         self.last_q = self.powergrid.sgen["q_mvar"].to_numpy(copy=True)
 
         # initialise voltage barrier function
         self.voltage_barrier = VoltageBarrier(self.voltage_loss_type)
         self._rendering_initialized = False
-        self._cal_agents_topo()
-        print(1)
-
 
 
     def reset(self, reset_time=True):
@@ -254,6 +252,7 @@ class VoltageControl(MultiAgentEnv):
            the default state: voltage, active power of generators, bus state, load active power, load reactive power
         """
         state = []
+        n = self.get_num_of_agents()
         if "date" in self.state_space:
             idx = self.start_idx + self.steps - 1
             state.append(self.pv_data.index[idx].month)
@@ -262,18 +261,38 @@ class VoltageControl(MultiAgentEnv):
             # state.append(self.pv_data.index[idx].hour)
             # state.append(self.pv_data.index[idx].minute)
         if "demand" in self.state_space:
-            state += list(self.powergrid.res_bus["p_mw"].sort_index().to_numpy(copy=True))
-            state += list(self.powergrid.res_bus["q_mvar"].sort_index().to_numpy(copy=True))
+            copy_pmw_bus = copy.deepcopy(self.powergrid.res_bus["p_mw"])
+            copy_qmvar_bus = copy.deepcopy(self.powergrid.res_bus["q_mvar"])
+            for i in range(self.get_num_of_agents()):
+                bus_num = self.powergrid.sgen.loc[i,"bus"]
+                copy_pmw_bus.loc[bus_num] -= self.powergrid.sgen.loc[i,"p_mw"]
+                copy_qmvar_bus.loc[bus_num] -= self.powergrid.sgen.loc[i,"q_mvar"]
+            state += list(copy_pmw_bus.sort_index().to_numpy(copy=True))
+            state += list(copy_qmvar_bus.sort_index().to_numpy(copy=True))
         if "pv" in self.state_space:
-            state += list(self.powergrid.sgen["p_mw"].sort_index().to_numpy(copy=True))
+            pv_list = np.zeros(self.get_num_of_buses())
+            pv_list[self.powergrid.sgen["bus"]] += self.powergrid.sgen["p_mw"]
+            state += list(pv_list)
         if "reactive" in self.state_space:
-            state += list(self.powergrid.sgen["q_mvar"].sort_index().to_numpy(copy=True))
+            q_list = np.zeros(self.get_num_of_buses())
+            q_list[self.powergrid.sgen["bus"]] += self.powergrid.sgen["q_mvar"]
+            state += list(q_list)
         if "vm_pu" in self.state_space:
             state += list(self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True))
         if "va_degree" in self.state_space:
             state += list(self.powergrid.res_bus["va_degree"].sort_index().to_numpy(copy=True))
-        state = np.array(state)
-        return state
+        state += list(idx in list(self.powergrid.sgen["bus"]) for idx in self.powergrid["bus"].index)
+        state = np.array(state,dtype=np.float64)
+        self.agent_idx_in_state = np.array(list(self.powergrid.sgen.loc[:,"bus"]))
+        state = state.reshape(self.obs_dim,-1).transpose()
+
+        agent_feats = state[self.powergrid.sgen.loc[:,"bus"]]
+        edges_feats = np.zeros((n,n,self.obs_dim))
+        for k,v in self.agent_lca.items():
+            for j in range(n):
+                edges_feats[k,j,:] = np.mean(state[v[j]],axis = 0)
+
+        return (agent_feats,edges_feats)
 
     def get_obs(self):
         """return the obs for each agent in the power system
@@ -845,11 +864,11 @@ class VoltageControl(MultiAgentEnv):
     
     def _cal_agents_topo(self):
         n = self.get_num_of_agents()
-        self.topology = top.create_nxgraph(self.powergrid)
+        self.topology = top.create_nxgraph(self.base_powergrid)
         shortest_path = []
         self.agent_lca = {}
         for i in range(n):
-            shortest_path.append(nx.shortest_path(self.topology,0,self.powergrid.sgen.loc[i,"bus"]))
+            shortest_path.append(nx.shortest_path(self.topology,0,self.base_powergrid.sgen.loc[i,"bus"]))
         
         for i in range(n):
             self.agent_lca[i] = []
