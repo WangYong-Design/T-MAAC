@@ -57,9 +57,9 @@ class PGTrainer(object):
         else:
             params.append(
                 {'params': self.behaviour_net.value_dicts.parameters(), 'lr': args.value_lrate})
-        if self.args.encoder:
-            params.append(
-                {'params': self.behaviour_net.encoder.parameters(), 'lr': args.encoder_lrate})
+        # if self.args.encoder:
+        #     params.append(
+        #         {'params': self.behaviour_net.encoder.parameters(), 'lr': args.encoder_lrate})
         self.value_optimizer = optim.RMSprop(params, alpha=0.99, eps=1e-5)
         # mixer optim
         if self.args.mixer:

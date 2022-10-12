@@ -2,7 +2,7 @@ alg: "icstransmaddpg"
 
 alg_args:
     "policy_lrate": 1.0e-4
-    "value_lrate": 1.0e-4
+    "value_lrate": 1.0e-5
     "agent_type": "transformer"
     "gaussian_policy": False
     "action_enforcebound": True
@@ -26,6 +26,7 @@ alg_args:
     "value_grad": True
     "merge_act": False
     "dropout": 0.3
+    "critic_n_layers": 2
     "norm_type": "batchnorm"
 
     # for cost (not used)

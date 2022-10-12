@@ -26,7 +26,7 @@ class SacledDotProductAttention(nn.Module):
             logits += mask[:, None, :, :].expand_as(logits)
 
         shp = [q.size(0), q.size(2), q.size(1) * q.size(-1)]
-        attn = F.softmax(torch.exp(logits), dim=3)
+        attn = F.softmax(logits, dim=3)
         attn = torch.matmul(attn, v).transpose(1, 2)
 
         return attn.reshape(*shp),scores.transpose(1, 3).reshape(B, n, n,n_heads*key_dim)
@@ -111,7 +111,7 @@ class graphtransformer(nn.Module):
         self.args = args
         self.in_dim = in_dim
         self.hidd_dim = self.args.hid_size
-        self.n_layers = self.args.n_layers
+        self.n_layers = self.args.critic_n_layers
         self.head_num = self.args.attend_heads
         
         self.h_proj_layer = nn.Linear(self.in_dim,self.hidd_dim)
