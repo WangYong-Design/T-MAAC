@@ -53,11 +53,11 @@ class transformerlayer(nn.Module):
 
         self.h_feed_forward = nn.Sequential(
             nn.Linear(self.embed_dim, self.embed_dim * 2), nn.ReLU(),
-            nn.Dropout(p=self.args.dropout,training = self.training),
+            # nn.Dropout(p=self.args.dropout,training = self.training),
             nn.Linear(self.embed_dim * 2, self.embed_dim))
         
         self.e_feed_forward =  nn.Sequential(nn.Linear(self.embed_dim,self.embed_dim),nn.ReLU(),
-                                            nn.Dropout(p=self.args.dropout,training = self.training),
+                                            # nn.Dropout(p=self.args.dropout,training = self.training),
                                             nn.Linear(self.embed_dim,self.embed_dim))
         # self.e_feed_forward2 = nn.Linear(self.embed_dim,self.embed_dim)
 

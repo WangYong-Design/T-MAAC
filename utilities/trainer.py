@@ -201,10 +201,10 @@ class PGTrainer(object):
         stat['mean_train_auxiliary_loss'] = auxiliary_loss.clone().mean().item()
 
     def run(self, stat, episode):
-        # self.behaviour_net.train()
+        self.behaviour_net.train()
         self.behaviour_net.train_process(stat, self)
         if (episode % self.args.eval_freq == self.args.eval_freq-1) or (episode == 0):
-            # self.behaviour_net.eval()
+            self.behaviour_net.eval()
             # self.behaviour_net.evaluation(stat, self, 'June')
             self.behaviour_net.evaluation(stat, self, 'All')
 
