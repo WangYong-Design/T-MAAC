@@ -1,4 +1,5 @@
 from re import X
+from tkinter import E
 import torch
 import numpy as np
 import torch.nn as nn
@@ -52,10 +53,13 @@ class transformerlayer(nn.Module):
 
         self.h_feed_forward = nn.Sequential(
             nn.Linear(self.embed_dim, self.embed_dim * 2), nn.ReLU(),
+            nn.Dropout(p=self.args.dropout,training = self.training),
             nn.Linear(self.embed_dim * 2, self.embed_dim))
         
-        self.e_feed_forward = nn.Linear(self.embed_dim,self.embed_dim)
-        self.e_feed_forward2 = nn.Linear(self.embed_dim,self.embed_dim)
+        self.e_feed_forward =  nn.Sequential(nn.Linear(self.embed_dim,self.embed_dim),nn.ReLU(),
+                                            nn.Dropout(p=self.args.dropout,training = self.training),
+                                            nn.Linear(self.embed_dim,self.embed_dim))
+        # self.e_feed_forward2 = nn.Linear(self.embed_dim,self.embed_dim)
 
         if self.args.norm_type == "layernorm":
             self.h_norm1 = nn.LayerNorm(self.embed_dim)
@@ -85,17 +89,30 @@ class transformerlayer(nn.Module):
 
         atten,edges_out = self.attention(Q,K,V,edges_input,mask)
         
-        x = x + self.O_h(atten)
-        x = self.h_norm1(x.view(-1,x.size(-1))).view(*x.size())
-        x = F.dropout(x,self.args.dropout,training = self.training)
-        x = x + self.h_feed_forward(x)
-        x = self.h_norm2(x.view(-1,x.size(-1))).view(*x.size())
+        x = x + self.O_h(F.dropout(atten,self.args.dropout,training=self.training))
+        e = edges_feats + self.O_e(F.dropout(edges_out,self.args.dropout,training=self.training))
 
-        e = edges_feats + self.O_e(edges_out)
+        x = self.h_norm1(x.view(-1,x.size(-1))).view(*x.size())
         e = self.e_norm1(e.view(-1,e.size(-1))).view(*e.size())
-        e = F.dropout(e, self.args.dropout, training=self.training)
-        e = e + self.e_feed_forward(e)
+
+        h_in2,e_in2 = x,e
+        x = h_in2+self.h_feed_forward(x)
+        e = e_in2+self.e_feed_forward(e)
+
+        x = self.h_norm2(x.view(-1,x.size(-1))).view(*x.size())
         e = self.e_norm2(e.view(-1,x.size(-1))).view(*e.size())
+        
+        # x = x + self.O_h(atten)
+        # x = self.h_norm1(x.view(-1,x.size(-1))).view(*x.size())
+        # x = F.dropout(x,self.args.dropout,training = self.training)
+        # x = x + self.h_feed_forward(x)
+        # x = self.h_norm2(x.view(-1,x.size(-1))).view(*x.size())
+
+        # e = edges_feats + self.O_e(edges_out)
+        # e = self.e_norm1(e.view(-1,e.size(-1))).view(*e.size())
+        # e = F.dropout(e, self.args.dropout, training=self.training)
+        # e = e + self.e_feed_forward(e)
+        # e = self.e_norm2(e.view(-1,x.size(-1))).view(*e.size())
 
         return x,e
 
