@@ -281,7 +281,7 @@ class VoltageControl(MultiAgentEnv):
             state += list(self.powergrid.res_bus["vm_pu"].sort_index().to_numpy(copy=True))
         if "va_degree" in self.state_space:
             state += list(self.powergrid.res_bus["va_degree"].sort_index().to_numpy(copy=True))
-        state += list(idx in list(self.powergrid.sgen["bus"]) for idx in self.powergrid["bus"].index)
+        # state += list(idx in list(self.powergrid.sgen["bus"]) for idx in self.powergrid["bus"].index)
         state = np.array(state,dtype=np.float64)
         self.agent_idx_in_state = np.array(list(self.powergrid.sgen.loc[:,"bus"]))
         state = state.reshape(self.obs_dim,-1).transpose()
@@ -304,7 +304,7 @@ class VoltageControl(MultiAgentEnv):
         if self.args.mode == "distributed":
             obs_zone_dict = list()
             zone_list = list()
-            self.obs_dim = 7
+            self.obs_dim = 6
             obs_len_list = list()
             agent_index_in_obs = list()
             self.obs_bus_num = []
@@ -339,7 +339,7 @@ class VoltageControl(MultiAgentEnv):
                 idx = list(zone_buses.index).index(sgen_bus)
                 pv_list[idx] = pv
                 q_list[idx] = q
-                obs += list(pv_flag)
+                # obs += list(pv_flag)
                 obs += list(pv_list)
                 obs += list(q_list)
                 obs_zone_dict.append(np.array(obs).reshape(self.obs_dim, -1).transpose().reshape(-1))

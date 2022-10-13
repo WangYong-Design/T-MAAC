@@ -51,8 +51,8 @@ class transformerlayer(nn.Module):
         self.O_e = nn.Linear(self.embed_dim,self.embed_dim)
 
         self.h_feed_forward = nn.Sequential(
-            nn.Linear(self.embed_dim, self.embed_dim * 4), nn.ReLU(),
-            nn.Linear(self.embed_dim * 4, self.embed_dim))
+            nn.Linear(self.embed_dim, self.embed_dim * 2), nn.ReLU(),
+            nn.Linear(self.embed_dim * 2, self.embed_dim))
         
         self.e_feed_forward = nn.Linear(self.embed_dim,self.embed_dim)
         self.e_feed_forward2 = nn.Linear(self.embed_dim,self.embed_dim)
@@ -110,7 +110,7 @@ class graphtransformer(nn.Module):
         super().__init__()
         self.args = args
         self.in_dim = in_dim
-        self.hidd_dim = self.args.hid_size
+        self.hidd_dim = self.args.critic_hid_size
         self.n_layers = self.args.critic_n_layers
         self.head_num = self.args.attend_heads
         

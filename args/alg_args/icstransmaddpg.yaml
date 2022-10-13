@@ -26,8 +26,9 @@ alg_args:
     "value_grad": True
     "merge_act": False
     "dropout": 0.3
-    "critic_n_layers": 2
-    "norm_type": "batchnorm"
+    "critic_n_layers": 3
+    "norm_type": "layernorm"
+    "critic_hid_size": 32
 
     # for cost (not used)
     "cost_loss": False
