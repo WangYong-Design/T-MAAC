@@ -104,7 +104,8 @@ alg_config_dict["obs_bus_dim"] = env.get_obs_dim()
 alg_config_dict["obs_bus_num"] = env.get_obs_bus_num()
 alg_config_dict["action_dim"] = env.get_total_actions()
 alg_config_dict["bus_num"] = env.get_num_of_buses()
-# alg_config_dict["obs_position_list"] = env.get_obs_position_list()
+alg_config_dict["agent_lca"] = env.get_agent_lca()
+alg_config_dict["lca_len"] = env.get_lca_len()
 alg_config_dict["region_num"] = env.get_num_of_regions()
 alg_config_dict['constraint_mask'] = env.get_constraint_mask()
 alg_config_dict['agent2region'] = env.get_agent2region()
@@ -172,10 +173,6 @@ model = Model[argv.alg]
 
 strategy = Strategy[argv.alg]
 
-# LOAD_MODEL_PATH = save_path + "model_save/"+log_name+"/model.pt"
-# checkout = th.load(LOAD_MODEL_PATH,map_location="cpu") if not th.cuda.is_available() else th.load(LOAD_MODEL_PATH)
-# model.load_state_dict(checkout["model_state_dict"])
-
 print(f"{args}\n")
 
 if strategy == "pg":
@@ -184,6 +181,10 @@ elif strategy == "q":
     raise NotImplementedError("This needs to be implemented.")
 else:
     raise RuntimeError("Please input the correct strategy, e.g. pg or q.")
+
+# LOAD_MODEL_PATH = save_path + "model_save/"+log_name+"/model.pt"
+# checkout = th.load(LOAD_MODEL_PATH,map_location="cpu") if not th.cuda.is_available() else th.load(LOAD_MODEL_PATH)
+# train.behaviour_net.load_state_dict(checkout["model_state_dict"])
 
 # train.behaviour_net.load_state_dict(checkout["model_state_dict"])
 

@@ -54,6 +54,7 @@ class PGTrainer(object):
             params.append({'params': other_params, 'lr': args.value_lrate})
             params.append({'params': self.behaviour_net.value_dicts[0].cost_head.parameters(
             ), 'lr': args.cost_head_lrate})
+            params.append({'params':self.behaviour_net.EdgeFeatures.parameters(),'lr':args.embed_lrate})
         else:
             params.append(
                 {'params': self.behaviour_net.value_dicts.parameters(), 'lr': args.value_lrate})

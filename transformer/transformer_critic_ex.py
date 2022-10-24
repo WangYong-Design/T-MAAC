@@ -5,7 +5,8 @@ import torch.nn.functional as F
 import numpy as np
 
 
-def multi_head_attention(q, k, v, mask=None):
+
+def multi_head_attention(q, k, v, mask=None,attentive_bias = None):
     # q shape = (B, n_heads, n, key_dim)   : n can be either 1 or N
     # k,v shape = (B, n_heads, N, key_dim)
     # mask.shape = (B, group, N)
@@ -13,10 +14,13 @@ def multi_head_attention(q, k, v, mask=None):
     B, n_heads, n, key_dim = q.shape
 
     # score.shape = (B, n_heads, n, N)
-    score = th.matmul(q, k.transpose(2, 3)) / np.sqrt(q.size(-1))
+    score = th.matmul(q, k.transpose(2, 3))
 
     if mask is not None:
         score += mask[:, None, :, :].expand_as(score)
+    
+    if attentive_bias is not None:
+        score += attentive_bias[None,:,:,:].expand_as(score)
 
     shp = [q.size(0), q.size(-2), q.size(1) * q.size(-1)]
     attn = th.matmul(F.softmax(score, dim=3), v).transpose(1, 2)
@@ -34,9 +38,11 @@ class EncoderLayer(nn.Module):
 
         self.n_heads = n_heads
 
+        self.scaling = (embedding_dim // self.n_heads) ** -0.5
+
         self.Wq = nn.Linear(embedding_dim, embedding_dim, bias=False)
         self.Wk = nn.Linear(embedding_dim, embedding_dim, bias=False)
-        self.Wv = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.Wv = nn.Linear(embedding_dim, embedding_dim, bias=False) 
         self.multi_head_combine = nn.Linear(embedding_dim, embedding_dim)
         self.feed_forward = nn.Sequential(
             nn.Linear(embedding_dim, embedding_dim * 4), nn.ReLU(),
@@ -44,12 +50,28 @@ class EncoderLayer(nn.Module):
         self.norm1 = nn.LayerNorm(embedding_dim)
         self.norm2 = nn.LayerNorm(embedding_dim)
 
-    def forward(self, x, mask=None):
-        q = make_heads(self.Wq(x), self.n_heads)
+    def forward(self, x, mask=None,attentive_bias = None):
+        # residual = x
+        # q = make_heads(self.Wq(x), self.n_heads) * self.scaling
+        # k = make_heads(self.Wk(x), self.n_heads)
+        # v = make_heads(self.Wv(x), self.n_heads)
+        
+        # x = F.dropout(self.multi_head_combine(multi_head_attention(q, k, v, mask,attentive_bias)),p=0.1,training=self.training)
+        # x = residual + x
+        # x = self.norm1(x.view(-1, x.size(-1))).view(*x.size())
+        
+        # residual = x
+        # x = F.dropout(self.feed_forward(x),p=0.1,training=self.training)
+        # x = residual + x
+        # x = self.norm2(x.view(-1, x.size(-1))).view(*x.size())
+
+        q = make_heads(self.Wq(x), self.n_heads) * self.scaling
         k = make_heads(self.Wk(x), self.n_heads)
         v = make_heads(self.Wv(x), self.n_heads)
-        x = x + self.multi_head_combine(multi_head_attention(q, k, v, mask))
+        
+        x = x + self.multi_head_combine(multi_head_attention(q, k, v, mask,attentive_bias))
         x = self.norm1(x.view(-1, x.size(-1))).view(*x.size())
+    
         x = x + self.feed_forward(x)
         x = self.norm2(x.view(-1, x.size(-1))).view(*x.size())
         return x
@@ -68,6 +90,8 @@ class TransformerCritic(nn.Module):
         self.attend_heads = args.attend_heads
         self.args = args
         self.init_projection_layer = nn.Linear(input_shape, self.hidden_dim)
+
+
         self.attn_layers = nn.ModuleList([
             EncoderLayer(embedding_dim=self.hidden_dim,
                          n_heads=self.attend_heads)
@@ -90,11 +114,12 @@ class TransformerCritic(nn.Module):
         elif args.hid_activation == 'tanh':
             self.hid_activation = nn.Tanh()
 
-    def forward(self, obs):
+    def forward(self, obs,attentive_bias):
         # obs : (b, n, d)
         x = self.init_projection_layer(obs)
+
         for layer in self.attn_layers:
-            x = layer(x)
+            x = layer(x,attentive_bias = attentive_bias.permute(2,0,1))
         pred_r = self.reward_head(
             x.view(-1, self.n_ * self.hidden_dim))    # (b, 1)
         pred_c = self.cost_head(x)  # (b,n,1)

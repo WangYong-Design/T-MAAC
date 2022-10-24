@@ -12,7 +12,7 @@
                 "--alg",
                 "icstransmaddpg",
                 "--alias",
-                "example_0",
+                "embed_test",
                 "--mode",
                 "distributed",
                 "--scenario",
@@ -22,7 +22,9 @@
                 "--voltage-barrier-type",
                 "l2",
                 "--save-path",
-                "trial"
+                "trial",
+                "--gpuid",
+                "2"
             ]
         }
     ]
@@ -61,7 +63,7 @@
 //                 "--alg",
 //                 "icstransmaddpg",
 //                 "--alias",
-//                 "ori",
+//                 "embed_6",
 //                 "--test-mode",
 //                 "test_data",
 //                 "--scenario",

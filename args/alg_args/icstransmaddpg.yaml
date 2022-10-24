@@ -2,7 +2,7 @@ alg: "icstransmaddpg"
 
 alg_args:
     "policy_lrate": 1.0e-4
-    "value_lrate": 1.0e-5
+    "value_lrate": 1.0e-4
     "agent_type": "transformer"
     "gaussian_policy": False
     "action_enforcebound": True
@@ -20,15 +20,17 @@ alg_args:
     "auxiliary_lrate": 1.0e-5 # encoder_lrate = auxiliary_lrate
 
     # for critic
-    "critic_type": "graph_transformer" # "graph_transformer" "transformer" "mlp"
+    "critic_type": "transformer" # "graph_transformer" "transformer" "mlp"
     "critic_encoder": False
     "use_emb": "glimpsed" # "glimpsed" or "mean"
     "value_grad": True
     "merge_act": False
-    "dropout": 0.3
-    "critic_n_layers": 3
-    "norm_type": "layernorm"
-    "critic_hid_size": 32
+    # "dropout": 0.3
+    # "critic_n_layers": 3
+    # "norm_type": "layernorm"
+    # "critic_hid_size": 32
+    "embed_dim": 16
+    "embed_lrate": 1.0e-5
 
     # for cost (not used)
     "cost_loss": False

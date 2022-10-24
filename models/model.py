@@ -16,9 +16,10 @@ class Model(nn.Module):
         self.hid_dim = self.args.hid_size
         self.obs_dim = self.args.obs_size
         self.act_dim = self.args.action_dim
-        self.Transition = namedtuple('Transition', ('state', 'agents_feats','edges_feats','action', 'log_prob_a', 'value', 'next_value',
-                                     'reward', 'cost', 'next_state', 'next_agents_feats','next_edges_feats','done', 'last_step', 
-                                     'action_avail', 'last_hid', 'hid'))
+        # self.Transition = namedtuple('Transition', ('state','action', 'log_prob_a', 'value', 'next_value',
+        #                              'reward', 'cost', 'next_state','done', 'last_step', 'action_avail', 'last_hid', 'hid'))
+        self.Transition = namedtuple('Transition', ('state','action', 'log_prob_a',
+                                'reward', 'cost', 'next_state','done', 'last_step', 'action_avail', 'last_hid', 'hid'))
         self.batchnorm = nn.BatchNorm1d(self.n_)
         self.costbatchnorm = nn.BatchNorm1d(self.n_)
 
@@ -249,25 +250,18 @@ class Model(nn.Module):
 
         # init hidden states
         last_hid = self.policy_dicts[0].init_hidden()
-        
-        if isinstance(global_state, tuple):
-            agents_feats,edges_feats = global_state
 
         for t in range(self.args.max_steps):
             # current state, action, value
             state_ = prep_obs(state).to(self.device).contiguous().view(
                 1, self.n_, self.obs_dim)
-            agents_feats_ = th.from_numpy(agents_feats).to(self.device)\
-                .float().contiguous().view(1,self.n_,self.obs_bus_dim)
-            edges_feats_  = th.from_numpy(edges_feats).to(self.device)\
-                .float().contiguous().view(1,self.n_,self.n_,self.obs_bus_dim)
 
             with th.no_grad():
                 action, action_pol, log_prob_a, _, hid = self.get_actions(state_, status='train', exploration=True, actions_avail=th.tensor(
                     trainer.env.get_avail_actions()), target=False, last_hid=last_hid)
-                value = self.value(agents_feats_,edges_feats_, action_pol)
-            if isinstance(value, tuple):
-                value, cost = value
+                # value = self.value(state_, action_pol)
+            # if isinstance(value, tuple):
+            #     value, cost = value
             _, actual = translate_action(self.args, action, trainer.env)
 
             # reward
@@ -280,23 +274,15 @@ class Model(nn.Module):
             out_of_control = [info['percentage_of_v_out_of_control']] * trainer.env.get_num_of_agents()
             # next state, action, value
             next_state = trainer.env.get_obs()
-            next_global_state = trainer.env.get_state()
-
-            if isinstance(global_state, tuple):
-                next_agents_feats,next_edges_feats = next_global_state
-            next_agents_feats_ = th.from_numpy(next_agents_feats).to(self.device)\
-                .float().contiguous().view(1,self.n_,self.obs_bus_dim)
-            next_edges_feats_  = th.from_numpy(next_edges_feats).to(self.device)\
-                .float().contiguous().view(1,self.n_,self.n_,self.obs_bus_dim)
 
             next_state_ = prep_obs(next_state).to(
                 self.device).contiguous().view(1, self.n_, self.obs_dim)
             with th.no_grad():
                 _, next_action_pol, _, _, _ = self.get_actions(next_state_, status='train', exploration=True, actions_avail=th.tensor(
                     trainer.env.get_avail_actions()), target=False, last_hid=hid)
-                next_value = self.value(next_agents_feats_,next_edges_feats_, next_action_pol)
-            if isinstance(next_value, tuple):
-                next_value, next_cost = next_value
+            #     next_value = self.value(next_state_,next_action_pol)
+            # if isinstance(next_value, tuple):
+            #     next_value, next_cost = next_value
             # store trajectory
             if isinstance(done, list):
                 done = np.sum(done)
@@ -304,17 +290,13 @@ class Model(nn.Module):
             # if not self.args.safe_trans or info["totally_controllable_ratio"] == 1.:
             trans = self.Transition(state,
                                     # action_pol.detach().cpu().numpy() if self.args.safe_filter == 'none' else safe_action_pol,
-                                    agents_feats,
-                                    edges_feats,
                                     action_pol.detach().cpu().numpy(),
                                     log_prob_a,
-                                    value.detach().cpu().numpy(),
-                                    next_value.detach().cpu().numpy(),
+                                    # value.detach().cpu().numpy(),
+                                    # next_value.detach().cpu().numpy(),
                                     np.array(reward_repeat),
                                     np.array(out_of_control),
                                     next_state,
-                                    next_agents_feats,
-                                    next_edges_feats,
                                     done,
                                     done_,
                                     trainer.env.get_avail_actions(),
@@ -340,7 +322,6 @@ class Model(nn.Module):
 
             # set the next state
             state = next_state
-            agents_feats,edges_feats = next_agents_feats,next_edges_feats
 
             # set the next last_hid
             last_hid = hid
@@ -455,16 +436,12 @@ class Model(nn.Module):
                            dtype=th.float).to(self.device)
         log_prob_a = th.tensor(np.concatenate(
             batch.action, axis=0), dtype=th.float).to(self.device)
-        value = th.tensor(np.concatenate(batch.value, axis=0),
-                          dtype=th.float).to(self.device)
-        next_value = th.tensor(np.concatenate(
-            batch.next_value, axis=0), dtype=th.float).to(self.device)
+        # value = th.tensor(np.concatenate(batch.value, axis=0),
+        #                   dtype=th.float).to(self.device)
+        # next_value = th.tensor(np.concatenate(
+        #     batch.next_value, axis=0), dtype=th.float).to(self.device)
         state = prep_obs(list(zip(batch.state))).to(self.device)
         next_state = prep_obs(list(zip(batch.next_state))).to(self.device)
-        agents_feats = prep_obs(list(zip(batch.agents_feats))).to(self.device)
-        edges_feats = prep_obs(list(zip(batch.edges_feats))).to(self.device)
-        next_agents_feats = prep_obs(list(zip(batch.next_agents_feats))).to(self.device)
-        next_edges_feats = prep_obs(list(zip(batch.next_edges_feats))).to(self.device)
         action_avail = th.tensor(np.concatenate(
             batch.action_avail, axis=0)).to(self.device)
         last_hid = th.tensor(np.concatenate(
@@ -474,5 +451,5 @@ class Model(nn.Module):
         if self.args.reward_normalisation:
             reward = self.batchnorm(reward).to(self.device)
             # cost = self.costbatchnorm(cost).to(self.device)
-        return (state, agents_feats,edges_feats,action, log_prob_a, value, next_value, reward, cost, 
-                next_state, next_agents_feats,next_edges_feats,done, last_step, action_avail, last_hid, hid)
+        return (state,action, log_prob_a, reward, cost, 
+                next_state,done, last_step, action_avail, last_hid, hid)
