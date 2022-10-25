@@ -135,7 +135,7 @@ class ICSTRANSMADDPG(Model):
 
         if self.args.shared_params:
             enc_obs, _, _ = self.encode(raw_obs)
-            # _, _, enc_obs = self.encode(raw_obs)tmu
+            # _, _, enc_obs = self.encode(raw_obs)
             agent_policy = self.policy_dicts[0]
             means, log_stds, hiddens = agent_policy(enc_obs, last_hid)
             # hiddens = th.stack(hiddens, dim=1)

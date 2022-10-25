@@ -29,6 +29,7 @@ class NodeEmbeddingFeature(nn.Module):
 
         self.node_embedding = nn.Embedding(self.bus_num + 1,self.embed_dim*self.attend_heads,padding_idx=322)
         self.proj_bias = nn.Linear(self.embed_dim,1,bias = False)
+        # self.proj_bias = nn.Linear(self.embed_dim*self.attend_heads,self.attend_heads,bias = False)
 
         self.agent_lca = torch.tensor(args.agent_lca,dtype=torch.long).to("cuda")
         self.lca_len = torch.tensor(args.lca_len,dtype = torch.long).to("cuda")
@@ -47,6 +48,7 @@ class NodeEmbeddingFeature(nn.Module):
         
         
         attentive_bias = self.proj_bias(edge_embed.transpose(2,3))  
+        # attentive_bias = self.proj_bias(edge_embed.reshape(self.n_,self.n_,-1))  
 
         # for i in range(self.agent_num):
         #     lca_i = self.agent_lca[i]
@@ -58,6 +60,7 @@ class NodeEmbeddingFeature(nn.Module):
         #         attentive_bias[i,j,:] = bias
         
         return attentive_bias.squeeze(-1)
+        # return attentive_bias
 
 
 

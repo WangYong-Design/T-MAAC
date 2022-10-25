@@ -19,11 +19,16 @@ def multi_head_attention(q, k, v, mask=None,attentive_bias = None):
     if mask is not None:
         score += mask[:, None, :, :].expand_as(score)
     
-    if attentive_bias is not None:
-        score += attentive_bias[None,:,:,:].expand_as(score)
+    score = F.softmax(score,dim=3)
+    attentive_score = F.softmax(attentive_bias,dim=2)
+    score = 0.9 * score +  0.1 * attentive_score[None,:,:,:] 
+    
+    # if attentive_bias is not None:
+    #     score += attentive_bias[None,:,:,:].expand_as(score)
 
     shp = [q.size(0), q.size(-2), q.size(1) * q.size(-1)]
-    attn = th.matmul(F.softmax(score, dim=3), v).transpose(1, 2)
+    attn = th.matmul(score, v).transpose(1, 2)
+    # attn = th.matmul(F.softmax(score, dim=3), v).transpose(1, 2)
     return attn.reshape(*shp)
 
 
@@ -69,9 +74,11 @@ class EncoderLayer(nn.Module):
         k = make_heads(self.Wk(x), self.n_heads)
         v = make_heads(self.Wv(x), self.n_heads)
         
+        # x = x + F.dropout(self.multi_head_combine(multi_head_attention(q, k, v, mask,attentive_bias)),p=0.1,training=self.training)
         x = x + self.multi_head_combine(multi_head_attention(q, k, v, mask,attentive_bias))
         x = self.norm1(x.view(-1, x.size(-1))).view(*x.size())
     
+        # x = x + F.dropout(self.feed_forward(x),p=0.1,training=self.training)
         x = x + self.feed_forward(x)
         x = self.norm2(x.view(-1, x.size(-1))).view(*x.size())
         return x

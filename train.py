@@ -186,8 +186,6 @@ else:
 # checkout = th.load(LOAD_MODEL_PATH,map_location="cpu") if not th.cuda.is_available() else th.load(LOAD_MODEL_PATH)
 # train.behaviour_net.load_state_dict(checkout["model_state_dict"])
 
-# train.behaviour_net.load_state_dict(checkout["model_state_dict"])
-
 with open(save_path + "tensorboard/" + log_name + "/log.txt", "w+") as file:
     alg_args2str = dict2str(alg_config_dict, 'alg_params')
     env_args2str = dict2str(env_config_dict, 'env_params')
