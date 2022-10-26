@@ -9,7 +9,7 @@ def init_params(module,n_layers):
         if module.bias is not None:
             module.bias.data.zero_()
     if isinstance(module,nn.Embedding):
-        module.weight.data.normal_(mean=0.0,std=0.2)
+        module.weight.data.normal_(mean=0.0,std=0.6)
         if module.padding_idx is not None:
             module.weight.data[module.padding_idx].zero_()
 

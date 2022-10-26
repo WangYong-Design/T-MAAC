@@ -12,7 +12,7 @@
                 "--alg",
                 "icstransmaddpg",
                 "--alias",
-                "embed_24",
+                "embed_49",
                 "--mode",
                 "distributed",
                 "--scenario",

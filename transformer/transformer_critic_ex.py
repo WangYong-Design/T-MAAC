@@ -19,16 +19,16 @@ def multi_head_attention(q, k, v, mask=None,attentive_bias = None):
     if mask is not None:
         score += mask[:, None, :, :].expand_as(score)
     
-    score = F.softmax(score,dim=3)
-    attentive_score = F.softmax(attentive_bias,dim=2)
-    score = 0.9 * score +  0.1 * attentive_score[None,:,:,:] 
+    # score = F.softmax(score,dim=3)
+    # attentive_score = F.softmax(attentive_bias,dim=2)
+    # score = 0.8 * score +  0.2 * attentive_score[None,:,:,:] 
     
-    # if attentive_bias is not None:
-    #     score += attentive_bias[None,:,:,:].expand_as(score)
+    if attentive_bias is not None:
+        score += attentive_bias[None,:,:,:].expand_as(score)
 
     shp = [q.size(0), q.size(-2), q.size(1) * q.size(-1)]
-    attn = th.matmul(score, v).transpose(1, 2)
-    # attn = th.matmul(F.softmax(score, dim=3), v).transpose(1, 2)
+    # attn = th.matmul(score, v).transpose(1, 2)
+    attn = th.matmul(F.softmax(score, dim=3), v).transpose(1, 2)
     return attn.reshape(*shp)
 
 

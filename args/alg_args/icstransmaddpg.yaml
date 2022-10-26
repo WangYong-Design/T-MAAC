@@ -2,7 +2,7 @@ alg: "icstransmaddpg"
 
 alg_args:
     "policy_lrate": 1.0e-4
-    "value_lrate": 1.0e-4
+    "value_lrate": 5.0e-5
     "agent_type": "transformer"
     "gaussian_policy": False
     "action_enforcebound": True
@@ -30,7 +30,7 @@ alg_args:
     # "norm_type": "layernorm"
     # "critic_hid_size": 32
     "embed_dim": 16
-    "embed_lrate": 1.0e-5
+    "embed_lrate": 5.0e-5
 
     # for cost (not used)
     "cost_loss": False
