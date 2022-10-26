@@ -9,7 +9,7 @@ def init_params(module,n_layers):
         if module.bias is not None:
             module.bias.data.zero_()
     if isinstance(module,nn.Embedding):
-        module.weight.data.normal_(mean=0.0,std=0.6)
+        module.weight.data.normal_(mean=0.0,std=0.2)
         if module.padding_idx is not None:
             module.weight.data[module.padding_idx].zero_()
 
@@ -42,12 +42,12 @@ class NodeEmbeddingFeature(nn.Module):
         " Compute edge attention bias"
         
         edge_embed = self.node_embedding(self.agent_lca).view(self.n_,self.n_,\
-        torch.max(self.lca_len),self.embed_dim,self.attend_heads)
+        torch.max(self.lca_len),self.attend_heads,self.embed_dim)
 
         edge_embed = edge_embed.sum(dim=2)/self.lca_len[:,:,None,None]  # (n_,n_,embed_dim,atten_heads)
         
         
-        attentive_bias = self.proj_bias(edge_embed.transpose(2,3))  
+        attentive_bias = self.proj_bias(edge_embed)  
         # attentive_bias = self.proj_bias(edge_embed.reshape(self.n_,self.n_,-1))  
 
         # for i in range(self.agent_num):
