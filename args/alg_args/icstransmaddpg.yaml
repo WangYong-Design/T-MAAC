@@ -27,7 +27,7 @@ alg_args:
     "merge_act": False
     "attentive_score": True
     "lca_hid_size": 16
-    "lca_n_layers": 2
+    "lca_n_layers": 1
     "lca_attend_heads": 2
     "lca_lr": 1.0e-4
 

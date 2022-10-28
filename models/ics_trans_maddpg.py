@@ -23,7 +23,6 @@ class ICSTRANSMADDPG(Model):
         self.obs_bus_dim = args.obs_bus_dim
         self.obs_bus_num = np.max(args.obs_bus_num)
         self.agent_index_in_obs = args.agent_index_in_obs
-        self.agent_lca_pad = args.agent_lca_pad
         self.obs_mask = th.zeros(self.n_, self.obs_bus_num).to(self.device)
         self.obs_flag = th.ones(self.n_, self.obs_bus_num).to(self.device)
         self.q_index = -1
@@ -55,7 +54,7 @@ class ICSTRANSMADDPG(Model):
             self.target_net = target_net
             self.reload_params_to_target()
         self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
-        self.cal_bias_score_mask()
+        # self.cal_bias_score_mask()
         self.cal_bus_position_embed()
 
     # def construct_policy_net(self):
@@ -203,7 +202,7 @@ class ICSTRANSMADDPG(Model):
         attentive_score=None
         if self.args.attentive_score:
             global_state_ = th.cat([global_state,self.bus_position.unsqueeze(0).repeat(bs,1,1)],dim=2)
-            attentive_score = self.attentive_score_tran(obs,global_state_,self.bias_mask)
+            attentive_score = self.attentive_score_tran(obs,global_state_)
 
         if self.args.critic_encoder:
             if self.args.value_grad:
