@@ -286,6 +286,7 @@ class VoltageControl(MultiAgentEnv):
         self.agent_idx_in_state = np.array(list(self.powergrid.sgen.loc[:,"bus"]))
         state = state.reshape(self.obs_dim,-1).transpose()
 
+        # state = np.concatenate((state,np.zeros((1,self.obs_dim))),axis=0)
         # agent_feats = state[self.powergrid.sgen.loc[:,"bus"]]
         # edges_feats = np.zeros((n,n,self.obs_dim))
         # for k,v in self.agent_lca.items():
@@ -867,33 +868,35 @@ class VoltageControl(MultiAgentEnv):
         n = self.get_num_of_agents()
         self.topology = top.create_nxgraph(self.base_powergrid)
         shortest_path = []
-        lca_dict = {}
-        self.agent_lca = []
+        self.lca_dict = {}
         for i in range(n):
             shortest_path.append(nx.shortest_path(self.topology,0,self.base_powergrid.sgen.loc[i,"bus"]))
         
         self.max_lca_len = 0
         self.lca_len = np.zeros((n,n),dtype = np.int32)
         for i in range(n):
-            lca_dict[i] = []
+            self.lca_dict[i] = []
             for j in range(n): 
                 lca_nodes = list(set(shortest_path[i])&set(shortest_path[j]))
                 lca_nodes.sort(key = shortest_path[i].index)
-                lca_dict[i].append(lca_nodes)
+                self.lca_dict[i].append(lca_nodes)
                 self.lca_len[i,j] = len(lca_nodes)
                 if len(lca_nodes) > self.max_lca_len:
                     self.max_lca_len = len(lca_nodes)
         
-        self.agent_lca = np.zeros((self.n_agents,self.n_agents,self.max_lca_len))
+        self.agent_lca_pad = np.zeros((self.n_agents,self.n_agents,self.max_lca_len))
         for i in range(n):
             for j in range(n):
                 bus_num = len(self.base_powergrid.bus)
-                pad_lca = np.concatenate([lca_dict[i][j],
+                pad_lca = np.concatenate([self.lca_dict[i][j],
                                         np.zeros(self.max_lca_len - self.lca_len[i][j],dtype=np.int32)+bus_num])
-                self.agent_lca[i,j,:] = pad_lca
+                self.agent_lca_pad[i,j,:] = pad_lca
 
+    def get_agent_lca_pad(self):
+        return self.agent_lca_pad
+    
     def get_agent_lca(self):
-        return self.agent_lca
+        return self.lca_dict
     
     def get_lca_len(self):
         return self.lca_len

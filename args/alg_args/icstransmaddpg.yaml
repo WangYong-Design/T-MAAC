@@ -3,19 +3,19 @@ alg: "icstransmaddpg"
 alg_args:
     "policy_lrate": 1.0e-4
     "value_lrate": 1.0e-4
-    "agent_type": "transformer"
+    "agent_type": "mlp"
     "gaussian_policy": False
     "action_enforcebound": True
 
     # for actor
-    "encoder": True
+    "encoder": False
     "encoder_lrate": 1.0e-5 # for encoder in critic
     "attend_heads": 4
     "n_layers": 3
     "pretrained": null # None / encoder.pth
 
     # for actor encoder
-    "auxiliary": True
+    "auxiliary": False
     "auxiliary_update_epochs": 10
     "auxiliary_lrate": 1.0e-5 # encoder_lrate = auxiliary_lrate
 
@@ -25,12 +25,17 @@ alg_args:
     "use_emb": "glimpsed" # "glimpsed" or "mean"
     "value_grad": True
     "merge_act": False
-    # "dropout": 0.3
+    "attentive_score": True
+    "lca_hid_size": 16
+    "lca_n_layers": 2
+    "lca_attend_heads": 2
+    "lca_lr": 1.0e-4
+
     # "critic_n_layers": 3
     # "norm_type": "layernorm"
     # "critic_hid_size": 32
-    "embed_dim": 16
-    "embed_lrate": 1.0e-4
+    # "embed_dim": 16
+    # "embed_lrate": 1.0e-4
 
     # for cost (not used)
     "cost_loss": False

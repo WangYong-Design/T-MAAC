@@ -7,9 +7,9 @@ from utilities.util import select_action
 from models.model import Model
 from critics.mlp_critic import MLPCritic
 from transformer.transformer_critic_ex import TransformerCritic
-from transformer.graph_transformer_critic import graphtransformer
 from transformer.transformer_encoder_adj import TransformerEncoder
-from transformer.nodeEmbedding import NodeEmbeddingFeature
+from transformer.transformer_lca_sco import TransformerlcaScore,PositionalEncoding
+from transformer.graph_transformer_critic import graphtransformer
 
 class ICSTRANSMADDPG(Model):
     def __init__(self, args, target_net=None):
@@ -23,6 +23,7 @@ class ICSTRANSMADDPG(Model):
         self.obs_bus_dim = args.obs_bus_dim
         self.obs_bus_num = np.max(args.obs_bus_num)
         self.agent_index_in_obs = args.agent_index_in_obs
+        self.agent_lca_pad = args.agent_lca_pad
         self.obs_mask = th.zeros(self.n_, self.obs_bus_num).to(self.device)
         self.obs_flag = th.ones(self.n_, self.obs_bus_num).to(self.device)
         self.q_index = -1
@@ -40,7 +41,8 @@ class ICSTRANSMADDPG(Model):
             self.adj_mask[i] = self.adj_mask[i] - th.diag_embed(th.diag(self.adj_mask[i]))
         self.adj_mask = self.adj_mask.masked_fill(self.adj_mask == 1, -np.inf)
         self.encoder = TransformerEncoder(self.obs_bus_num, self.obs_bus_dim + self.region_num, args)
-        self.EdgeFeatures = NodeEmbeddingFeature(args)
+        self.attentive_score_tran = TransformerlcaScore(self.obs_dim,self.obs_bus_dim,args)
+        self.position_embed = PositionalEncoding(self.args,embed_dim=self.args.lca_hid_size,dropout=0.0,max_len=self.args.bus_num)
 
         # for transformer encoder pretrained, not useful
         if self.args.pretrained is not None:
@@ -53,18 +55,20 @@ class ICSTRANSMADDPG(Model):
             self.target_net = target_net
             self.reload_params_to_target()
         self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
+        self.cal_bias_score_mask()
+        self.cal_bus_position_embed()
 
-    def construct_policy_net(self):
-        # transformer encoder + mlp head
-        if self.args.agent_type == 'transformer':
-            from transformer.transformer_policy_head import TransformerAgent
-            Agent = TransformerAgent
-        else:
-            NotImplementedError()
-        if self.args.shared_params:
-            self.policy_dicts = nn.ModuleList([ Agent(self.args) ])
-        else:
-            self.policy_dicts = nn.ModuleList([ Agent(self.args) for _ in range(self.n_) ])
+    # def construct_policy_net(self):
+    #     # transformer encoder + mlp head
+    #     if self.args.agent_type == 'transformer':
+    #         from transformer.transformer_policy_head import TransformerAgent
+    #         Agent = TransformerAgent
+    #     else:
+    #         NotImplementedError()
+    #     if self.args.shared_params:
+    #         self.policy_dicts = nn.ModuleList([ Agent(self.args) ])
+    #     else:
+    #         self.policy_dicts = nn.ModuleList([ Agent(self.args) for _ in range(self.n_) ])
 
     def construct_value_net(self):
         # (transformer encoder / raw obs) + transformer critic
@@ -129,33 +133,78 @@ class ICSTRANSMADDPG(Model):
         mean_emb = (emb * flag_mask).sum(dim=1) / flag_mask.sum(dim=1)
         return emb_agent_glimpsed, _, mean_emb
 
-    def policy(self, raw_obs, schedule=None, last_act=None, last_hid=None, info={}, stat={}):
-        # obs_shape = (b, n, o)
-        batch_size = raw_obs.size(0)
+    # def policy(self, raw_obs, schedule=None, last_act=None, last_hid=None, info={}, stat={}):
+    #     # obs_shape = (b, n, o)
+    #     batch_size = raw_obs.size(0)
 
-        if self.args.shared_params:
-            enc_obs, _, _ = self.encode(raw_obs)
-            # _, _, enc_obs = self.encode(raw_obs)
-            agent_policy = self.policy_dicts[0]
-            means, log_stds, hiddens = agent_policy(enc_obs, last_hid)
-            # hiddens = th.stack(hiddens, dim=1)
-            means = means.contiguous().view(batch_size, self.n_, -1)
-            hiddens = hiddens.contiguous().view(batch_size, self.n_, -1)
-            if self.args.gaussian_policy:
-                log_stds = log_stds.contiguous().view(batch_size, self.n_, -1)
-            else:
-                stds = th.ones_like(means).to(self.device) * self.args.fixed_policy_std
-                log_stds = th.log(stds)
-        else:
-            NotImplementedError()
+    #     if self.args.shared_params:
+    #         enc_obs, _, _ = self.encode(raw_obs)
+    #         # _, _, enc_obs = self.encode(raw_obs)
+    #         agent_policy = self.policy_dicts[0]
+    #         means, log_stds, hiddens = agent_policy(enc_obs, last_hid)
+    #         # hiddens = th.stack(hiddens, dim=1)
+    #         means = means.contiguous().view(batch_size, self.n_, -1)
+    #         hiddens = hiddens.contiguous().view(batch_size, self.n_, -1)
+    #         if self.args.gaussian_policy:
+    #             log_stds = log_stds.contiguous().view(batch_size, self.n_, -1)
+    #         else:
+    #             stds = th.ones_like(means).to(self.device) * self.args.fixed_policy_std
+    #             log_stds = th.log(stds)
+    #     else:
+    #         NotImplementedError()
 
-        return means, log_stds, hiddens
+    #     return means, log_stds, hiddens
 
-    def value(self, obs, act):
+    def cal_bias_score_mask(self):
+        self.bias_mask = th.zeros((self.n_,self.n_,self.n_+2,self.n_+2))
+        for i in range(self.n_):
+            for j in range(self.n_):
+                len_i_j = self.args.lca_len[i][j]
+                mask = th.eye(self.n_+2,self.n_+2)
+                mask[:2+len_i_j,:2+len_i_j] = th.ones((len_i_j+2,len_i_j+2))
+                self.bias_mask[i,i,:,:] = mask
+        
+        self.bias_mask = self.bias_mask.masked_fill(self.bias_mask==0,-np.inf).to(self.device)
+
+    def cal_bus_position_embed(self):
+        self.bus_position = self.position_embed().to(self.device)
+
+    def value(self, obs,global_state, act):
         # obs = (b,n,obs_dim)
 
         bs,_,_ = obs.shape    
         
+        # attentive_score = None
+        # if self.args.attentive_score:
+        #     attentive_score = th.zeros((bs,self.n_,self.n_)).to(self.device)
+        #     for i in range(self.n_):
+        #         agent_i_obs = obs[:,i,:]
+        #         for j in range(self.n_):
+        #             agent_j_obs = obs[:,j,:].to(self.device)
+        #             lca_nodes = global_state[:,self.agent_lca[i][j]].clone().to(self.device)
+        #             agent_obs_in = th.stack((agent_i_obs,agent_j_obs),dim=1).to(self.device)
+        #             attentive_score[:,i,j] = self.attentive_score_tran(agent_obs_in,lca_nodes)
+
+        # attentive_score1 = th.zeros((bs,self.n_,self.n_)).to(self.device)
+        # for i in range(self.n_):
+        #     agent_i_obs = obs[:,i,:]
+        #     for j in range(self.n_):
+        #         agent_j_obs = obs[:,j,:].to(self.device)
+        #         lca_nodes = global_state[:,self.agent_lca_pad[i][j]].clone().to(self.device)
+        #         agent_obs_in = th.stack((agent_i_obs,agent_j_obs),dim=1).to(self.device)
+        #         obs_ = self.attentive_score_tran.proj_obs(agent_obs_in)
+        #         node_ = self.attentive_score_tran.proj_node(lca_nodes)
+        #         x = th.cat((obs_,node_),dim = -2)
+        #         for layer in self.attentive_score_tran.attn_layers:
+        #             x = layer(x)
+        #         aggre_h = th.cat((x[:,0,:],x[:,1,:]),dim=1)
+        #         attentive_score1[:,i,j] = self.attentive_score_tran.out_layer(aggre_h).squeeze(1)
+
+        attentive_score=None
+        if self.args.attentive_score:
+            global_state_ = th.cat([global_state,self.bus_position.unsqueeze(0).repeat(bs,1,1)],dim=2)
+            attentive_score = self.attentive_score_tran(obs,global_state_,self.bias_mask)
+
         if self.args.critic_encoder:
             if self.args.value_grad:
                 emb_agent_glimpsed, _, emb = self.encode(obs)
@@ -185,8 +234,7 @@ class ICSTRANSMADDPG(Model):
         if self.args.shared_params:
             agent_value = self.value_dicts[0]
             
-            attentive_bias = self.EdgeFeatures()
-            values, costs = agent_value(inputs,attentive_bias)
+            values, costs = agent_value(inputs,attentive_score)
             values = values.contiguous().unsqueeze(dim=-1).repeat(1, self.n_, 1).view(bs, self.n_, 1)
             
             if self.args.critic_type == "mlp":
@@ -223,7 +271,7 @@ class ICSTRANSMADDPG(Model):
         batch_size = len(batch.state)
         # state,actions, old_log_prob_a, old_values, old_next_values, rewards, cost, next_state,\
         
-        state,actions, old_log_prob_a, rewards, cost, next_state,\
+        state,global_state,actions, old_log_prob_a, rewards, cost, next_state,next_global_state,\
         done,last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
         
         _, actions_pol, log_prob_a, action_out, _ = self.get_actions(state, status='train', exploration=False, actions_avail=actions_avail, target=False, last_hid=last_hids)
@@ -232,13 +280,13 @@ class ICSTRANSMADDPG(Model):
         else:
             _, next_actions, _, _, _ = self.get_actions(next_state, status='train', exploration=False, actions_avail=actions_avail, target=True, last_hid=hids)
         
-        compose = self.value(state, actions_pol)
+        compose = self.value(state, global_state,actions_pol)
         values_pol, costs_pol = compose[0].contiguous().view(-1, self.n_), compose[1].contiguous().view(-1, self.n_)
         
-        compose = self.value(state, actions)
+        compose = self.value(state,global_state, actions)
         values, costs = compose[0].contiguous().view(-1, self.n_), compose[1].contiguous().view(-1, self.n_)
         
-        compose = self.target_net.value(next_state, next_actions.detach())
+        compose = self.target_net.value(next_state,next_global_state, next_actions.detach())
         next_values, next_costs = compose[0].contiguous().view(-1, self.n_), compose[1].contiguous().view(-1, self.n_)
         
         returns, cost_returns = th.zeros((batch_size, self.n_), dtype=th.float).to(self.device), th.zeros((batch_size, self.n_), dtype=th.float).to(self.device)
@@ -267,8 +315,8 @@ class ICSTRANSMADDPG(Model):
 
     def get_auxiliary_loss(self, batch):
         batch_size = len(batch.state)
-        state,actions, old_log_prob_a, rewards, cost, next_state,\
-        done, last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
+        state,global_state,actions, old_log_prob_a, rewards, cost, next_state,next_global_state,\
+        done,last_step, actions_avail, last_hids, hids = self.unpack_data(batch)
         
         obs = state.view(batch_size, self.n_, self.obs_bus_num, self.obs_bus_dim).contiguous() # (b*n, self.obs_bus_num, self.obs_bus_dim)
         with th.no_grad():

@@ -44,7 +44,7 @@ class NodeEmbeddingFeature(nn.Module):
         edge_embed = self.node_embedding(self.agent_lca).view(self.n_,self.n_,\
         torch.max(self.lca_len),self.attend_heads,self.embed_dim)
 
-        edge_embed = edge_embed.sum(dim=2)/self.lca_len[:,:,None,None]  # (n_,n_,embed_dim,atten_heads)
+        edge_embed = edge_embed.sum(dim=2)/self.lca_len[:,:,None,None]  # (n_,n_,atten_heads,embed_dim)
         
         
         attentive_bias = self.proj_bias(edge_embed)  
@@ -59,7 +59,7 @@ class NodeEmbeddingFeature(nn.Module):
         #         bias = self.proj_bias(embed.transpose(0,1)).squeeze(1)
         #         attentive_bias[i,j,:] = bias
         
-        return attentive_bias.squeeze(-1)
+        return attentive_bias.squeeze(-1).permute(2,0,1)
         # return attentive_bias
 
 

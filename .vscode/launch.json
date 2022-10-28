@@ -12,7 +12,7 @@
                 "--alg",
                 "icstransmaddpg",
                 "--alias",
-                "embed_49",
+                "example_test",
                 "--mode",
                 "distributed",
                 "--scenario",
@@ -24,7 +24,7 @@
                 "--save-path",
                 "trial",
                 "--gpuid",
-                "2"
+                "6"
             ]
         }
     ]

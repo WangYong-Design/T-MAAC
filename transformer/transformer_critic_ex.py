@@ -24,7 +24,7 @@ def multi_head_attention(q, k, v, mask=None,attentive_bias = None):
     # score = 0.8 * score +  0.2 * attentive_score[None,:,:,:] 
     
     if attentive_bias is not None:
-        score += attentive_bias[None,:,:,:].expand_as(score)
+        score += attentive_bias[:,None,:,:].expand_as(score)
 
     shp = [q.size(0), q.size(-2), q.size(1) * q.size(-1)]
     # attn = th.matmul(score, v).transpose(1, 2)
@@ -121,12 +121,12 @@ class TransformerCritic(nn.Module):
         elif args.hid_activation == 'tanh':
             self.hid_activation = nn.Tanh()
 
-    def forward(self, obs,attentive_bias):
+    def forward(self, obs,attentive_bias=None):
         # obs : (b, n, d)
         x = self.init_projection_layer(obs)
 
         for layer in self.attn_layers:
-            x = layer(x,attentive_bias = attentive_bias.permute(2,0,1))
+            x = layer(x,attentive_bias = attentive_bias)
         pred_r = self.reward_head(
             x.view(-1, self.n_ * self.hidden_dim))    # (b, 1)
         pred_c = self.cost_head(x)  # (b,n,1)

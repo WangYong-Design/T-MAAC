@@ -54,14 +54,16 @@ class PGTrainer(object):
             params.append({'params': other_params, 'lr': args.value_lrate})
             params.append({'params': self.behaviour_net.value_dicts[0].cost_head.parameters(
             ), 'lr': args.cost_head_lrate})
-            params.append({'params':self.behaviour_net.EdgeFeatures.parameters(),'lr':args.embed_lrate})
         else:
             params.append(
                 {'params': self.behaviour_net.value_dicts.parameters(), 'lr': args.value_lrate})
+        if hasattr(self.behaviour_net,"attentive_score_tran"):
+            params.append({"params":self.behaviour_net.attentive_score_tran.parameters(),"lr":args.lca_lr})
         # if self.args.encoder:
         #     params.append(
         #         {'params': self.behaviour_net.encoder.parameters(), 'lr': args.encoder_lrate})
         self.value_optimizer = optim.RMSprop(params, alpha=0.99, eps=1e-5)
+
         # mixer optim
         if self.args.mixer:
             self.mixer_optimizer = optim.RMSprop(

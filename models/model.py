@@ -18,8 +18,8 @@ class Model(nn.Module):
         self.act_dim = self.args.action_dim
         # self.Transition = namedtuple('Transition', ('state','action', 'log_prob_a', 'value', 'next_value',
         #                              'reward', 'cost', 'next_state','done', 'last_step', 'action_avail', 'last_hid', 'hid'))
-        self.Transition = namedtuple('Transition', ('state','action', 'log_prob_a',
-                                'reward', 'cost', 'next_state','done', 'last_step', 'action_avail', 'last_hid', 'hid'))
+        self.Transition = namedtuple('Transition', ('state','global_state','action', 'log_prob_a',
+                                'reward', 'cost', 'next_state','next_global_state','done', 'last_step', 'action_avail', 'last_hid', 'hid'))
         self.batchnorm = nn.BatchNorm1d(self.n_)
         self.costbatchnorm = nn.BatchNorm1d(self.n_)
 
@@ -274,6 +274,7 @@ class Model(nn.Module):
             out_of_control = [info['percentage_of_v_out_of_control']] * trainer.env.get_num_of_agents()
             # next state, action, value
             next_state = trainer.env.get_obs()
+            next_global_state = trainer.env.get_state()
 
             next_state_ = prep_obs(next_state).to(
                 self.device).contiguous().view(1, self.n_, self.obs_dim)
@@ -289,6 +290,7 @@ class Model(nn.Module):
             done_ = done or t == self.args.max_steps-1
             # if not self.args.safe_trans or info["totally_controllable_ratio"] == 1.:
             trans = self.Transition(state,
+                                    global_state,
                                     # action_pol.detach().cpu().numpy() if self.args.safe_filter == 'none' else safe_action_pol,
                                     action_pol.detach().cpu().numpy(),
                                     log_prob_a,
@@ -297,6 +299,7 @@ class Model(nn.Module):
                                     np.array(reward_repeat),
                                     np.array(out_of_control),
                                     next_state,
+                                    next_global_state,
                                     done,
                                     done_,
                                     trainer.env.get_avail_actions(),
@@ -322,6 +325,7 @@ class Model(nn.Module):
 
             # set the next state
             state = next_state
+            global_state = next_global_state
 
             # set the next last_hid
             last_hid = hid
@@ -442,6 +446,8 @@ class Model(nn.Module):
         #     batch.next_value, axis=0), dtype=th.float).to(self.device)
         state = prep_obs(list(zip(batch.state))).to(self.device)
         next_state = prep_obs(list(zip(batch.next_state))).to(self.device)
+        global_state = prep_obs(list(zip(batch.global_state))).to(self.device)
+        next_global_state = prep_obs(list(zip(batch.next_global_state))).to(self.device)
         action_avail = th.tensor(np.concatenate(
             batch.action_avail, axis=0)).to(self.device)
         last_hid = th.tensor(np.concatenate(
@@ -451,5 +457,5 @@ class Model(nn.Module):
         if self.args.reward_normalisation:
             reward = self.batchnorm(reward).to(self.device)
             # cost = self.costbatchnorm(cost).to(self.device)
-        return (state,action, log_prob_a, reward, cost, 
-                next_state,done, last_step, action_avail, last_hid, hid)
+        return (state,global_state,action, log_prob_a, reward, cost, 
+                next_state,next_global_state,done, last_step, action_avail, last_hid, hid)
