@@ -12,19 +12,19 @@
                 "--alg",
                 "icstransmaddpg",
                 "--alias",
-                "example_test",
+                "test_2_1",
                 "--mode",
                 "distributed",
                 "--scenario",
-                "case322_3min_final",
+                "case141_3min_final",
                 "--qweight",
-                "0.1",
+                "0.01",
                 "--voltage-barrier-type",
                 "l2",
                 "--save-path",
                 "trial",
                 "--gpuid",
-                "6"
+                "0"
             ]
         }
     ]

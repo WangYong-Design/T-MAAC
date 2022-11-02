@@ -25,7 +25,7 @@ alg_args:
     "use_emb": "glimpsed" # "glimpsed" or "mean"
     "value_grad": True
     "merge_act": False
-    "attentive_score": True
+    "attentive_score": False
     "lca_hid_size": 16
     "lca_n_layers": 1
     "lca_attend_heads": 2

@@ -25,6 +25,7 @@ def multi_head_attention(q, k, v, mask=None,attentive_bias = None):
     
     if attentive_bias is not None:
         score += attentive_bias[:,None,:,:].expand_as(score)
+        # score += attentive_bias
 
     shp = [q.size(0), q.size(-2), q.size(1) * q.size(-1)]
     # attn = th.matmul(score, v).transpose(1, 2)
@@ -105,7 +106,7 @@ class TransformerCritic(nn.Module):
             for _ in range(self.n_layers)
         ])
         self.reward_head = nn.Sequential(
-            nn.Linear(self.hidden_dim * self.n_, self.hidden_dim),
+            nn.Linear(self.hidden_dim*self.n_, self.hidden_dim),
             nn.ReLU(),
             nn.Linear(self.hidden_dim, 1)
         )
@@ -127,6 +128,8 @@ class TransformerCritic(nn.Module):
 
         for layer in self.attn_layers:
             x = layer(x,attentive_bias = attentive_bias)
+        # pred_r = self.reward_head(
+        #     x.view(-1,self.hidden_dim))    # (b*n_, 1)
         pred_r = self.reward_head(
             x.view(-1, self.n_ * self.hidden_dim))    # (b, 1)
         pred_c = self.cost_head(x)  # (b,n,1)

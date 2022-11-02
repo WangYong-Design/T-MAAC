@@ -32,6 +32,7 @@ class ICSTRANSMADDPG(Model):
             self.obs_flag[i,args.obs_bus_num[i]:] = 0.
         self.agent2region = args.agent2region
         self.region_num = np.max(self.agent2region) + 1
+        self.max_lca_len = np.max(args.lca_len)
         self.adj_mask = th.zeros(self.n_, self.obs_bus_num, self.obs_bus_num).to(self.device)
         self.region_adj = self.args.region_adj
         for i in range(self.n_):
@@ -54,7 +55,7 @@ class ICSTRANSMADDPG(Model):
             self.target_net = target_net
             self.reload_params_to_target()
         self.batchnorm = nn.BatchNorm1d(self.args.agent_num).to(self.device)
-        # self.cal_bias_score_mask()
+        self.cal_bias_score_mask()
         self.cal_bus_position_embed()
 
     # def construct_policy_net(self):
@@ -155,15 +156,15 @@ class ICSTRANSMADDPG(Model):
     #     return means, log_stds, hiddens
 
     def cal_bias_score_mask(self):
-        self.bias_mask = th.zeros((self.n_,self.n_,self.n_+2,self.n_+2))
+        self.bias_mask = th.ones((self.n_,self.n_,self.max_lca_len+2,self.max_lca_len+2))
         for i in range(self.n_):
             for j in range(self.n_):
                 len_i_j = self.args.lca_len[i][j]
-                mask = th.eye(self.n_+2,self.n_+2)
+                mask = th.eye(self.max_lca_len+2,self.max_lca_len+2)
                 mask[:2+len_i_j,:2+len_i_j] = th.ones((len_i_j+2,len_i_j+2))
-                self.bias_mask[i,i,:,:] = mask
+                self.bias_mask[i,j,:,:] -= mask
         
-        self.bias_mask = self.bias_mask.masked_fill(self.bias_mask==0,-np.inf).to(self.device)
+        self.bias_mask = self.bias_mask.masked_fill(self.bias_mask==1,-np.inf).to(self.device)
 
     def cal_bus_position_embed(self):
         self.bus_position = self.position_embed().to(self.device)
@@ -199,10 +200,11 @@ class ICSTRANSMADDPG(Model):
         #         aggre_h = th.cat((x[:,0,:],x[:,1,:]),dim=1)
         #         attentive_score1[:,i,j] = self.attentive_score_tran.out_layer(aggre_h).squeeze(1)
 
-        attentive_score=None
+        attentive_score=(th.ones((bs,self.n_,self.n_))/38.).to("cuda")
+        # attentive_score=None
         if self.args.attentive_score:
             global_state_ = th.cat([global_state,self.bus_position.unsqueeze(0).repeat(bs,1,1)],dim=2)
-            attentive_score = self.attentive_score_tran(obs,global_state_)
+            attentive_score = self.attentive_score_tran(obs,global_state_,self.bias_mask)
 
         if self.args.critic_encoder:
             if self.args.value_grad:
@@ -234,6 +236,7 @@ class ICSTRANSMADDPG(Model):
             agent_value = self.value_dicts[0]
             
             values, costs = agent_value(inputs,attentive_score)
+            # values = values.contiguous().view(bs, self.n_, 1)
             values = values.contiguous().unsqueeze(dim=-1).repeat(1, self.n_, 1).view(bs, self.n_, 1)
             
             if self.args.critic_type == "mlp":

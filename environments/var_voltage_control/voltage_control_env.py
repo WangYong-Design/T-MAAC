@@ -884,11 +884,17 @@ class VoltageControl(MultiAgentEnv):
                 if len(lca_nodes) > self.max_lca_len:
                     self.max_lca_len = len(lca_nodes)
         
+        lca_len_sort = np.sort(self.lca_len,axis=1)
+        secd_len = lca_len_sort[:,-2]
+        row,col = np.diag_indices_from(self.lca_len)
+        self.lca_len[row,col] = secd_len
+        self.max_lca_len = np.max(self.lca_len)
+
         self.agent_lca_pad = np.zeros((self.n_agents,self.n_agents,self.max_lca_len))
         for i in range(n):
             for j in range(n):
                 bus_num = len(self.base_powergrid.bus)
-                pad_lca = np.concatenate([self.lca_dict[i][j],
+                pad_lca = np.concatenate([self.lca_dict[i][j][:self.lca_len[i][j]],
                                         np.zeros(self.max_lca_len - self.lca_len[i][j],dtype=np.int32)+bus_num])
                 self.agent_lca_pad[i,j,:] = pad_lca
 

@@ -51,35 +51,28 @@ class PositionalEncoding(nn.Module):
         return output
 
 
-def multi_head_attention(q, k, v, mask=None,attentive_bias = None):
-    # q shape = (B, n_heads, n, key_dim)   : n can be either 1 or N
-    # k,v shape = (B, n_heads, N, key_dim)
-    # mask.shape = (B, group, N)
+def multi_head_attention(q, k, v, mask=None,):
+    # q shape = (B, n_,n_,n_heads, N, key_dim)   : N=40
+    # k,v shape = (B, n_,n_,n_heads, N, key_dim)
+    # mask.shape = (B, n_,n_, N,N)
 
-    B, n_heads, n, key_dim = q.shape
+    B,n_,n_, n_heads, n, key_dim = q.shape
 
-    # score.shape = (B, n_heads, n, N)
-    score = th.matmul(q, k.transpose(2, 3))
+    # score.shape = (B, n_,n_,n_heads, N, N)
+    score = th.matmul(q, k.transpose(5, 4))
 
     if mask is not None:
-        score += mask[:, None, :, :].expand_as(score)
-    
-    # score = F.softmax(score,dim=3)
-    # attentive_score = F.softmax(attentive_bias,dim=2)
-    # score = 0.8 * score +  0.2 * attentive_score[None,:,:,:] 
-    
-    if attentive_bias is not None:
-        score += attentive_bias[:,None,:,:].expand_as(score)
+        score += mask[None,:, :,None, :, :].expand_as(score)
 
-    shp = [q.size(0), q.size(-2), q.size(1) * q.size(-1)]
+    shp = [q.size(0), q.size(1),q.size(2), q.size(-2),q.size(3)* q.size(-1)]
     # attn = th.matmul(score, v).transpose(1, 2)
-    attn = th.matmul(F.softmax(score, dim=3), v).transpose(1, 2)
+    attn = th.matmul(F.softmax(score, dim=5), v).transpose(4, 3)   # (B, n_,n_,N,n_heads, key_dim)
     return attn.reshape(*shp)
 
 
 def make_heads(qkv, n_heads):
-    shp = (qkv.size(0), qkv.size(1), n_heads, -1)
-    return qkv.reshape(*shp).transpose(1, 2)
+    shp = (qkv.size(0), qkv.size(1), qkv.size(2),qkv.size(3),n_heads, -1)
+    return qkv.reshape(*shp).transpose(-2,-3)
 
 
 class EncoderLayer(nn.Module):
@@ -100,34 +93,19 @@ class EncoderLayer(nn.Module):
         self.norm1 = nn.LayerNorm(embedding_dim)
         self.norm2 = nn.LayerNorm(embedding_dim)
 
-    def forward(self, x, mask=None,attentive_bias = None):
-        # residual = x
-        # q = make_heads(self.Wq(x), self.n_heads) * self.scaling
-        # k = make_heads(self.Wk(x), self.n_heads)
-        # v = make_heads(self.Wv(x), self.n_heads)
-        
-        # x = F.dropout(self.multi_head_combine(multi_head_attention(q, k, v, mask,attentive_bias)),p=0.1,training=self.training)
-        # x = residual + x
-        # x = self.norm1(x.view(-1, x.size(-1))).view(*x.size())
-        
-        # residual = x
-        # x = F.dropout(self.feed_forward(x),p=0.1,training=self.training)
-        # x = residual + x
-        # x = self.norm2(x.view(-1, x.size(-1))).view(*x.size())
-
+    def forward(self, x, mask=None):
         q = make_heads(self.Wq(x), self.n_heads) * self.scaling
         k = make_heads(self.Wk(x), self.n_heads)
         v = make_heads(self.Wv(x), self.n_heads)
-        
+
         # x = x + F.dropout(self.multi_head_combine(multi_head_attention(q, k, v, mask,attentive_bias)),p=0.1,training=self.training)
-        x = x + self.multi_head_combine(multi_head_attention(q, k, v, mask,attentive_bias))
+        x = x + self.multi_head_combine(multi_head_attention(q, k, v, mask))
         x = self.norm1(x.view(-1, x.size(-1))).view(*x.size())
-    
+
         # x = x + F.dropout(self.feed_forward(x),p=0.1,training=self.training)
         x = x + self.feed_forward(x)
         x = self.norm2(x.view(-1, x.size(-1))).view(*x.size())
         return x
-
 
 
 class TransformerlcaScore(nn.Module):
@@ -145,10 +123,11 @@ class TransformerlcaScore(nn.Module):
         self.n_ = args.agent_num
         self.max_lca_len = np.max(args.lca_len)
         self.agent_lca = args.agent_lca
+        self.agent_lca_pad = args.agent_lca_pad
 
         self.proj_obs = nn.Linear(obs_dim, self.hidden_dim)
         self.proj_node = nn.Linear(node_dim+self.hidden_dim,self.hidden_dim)
-        # self.padzeros = (0,0,0,1)
+        self.padzeros = (0,0,0,1)
 
         self.attn_layers = nn.ModuleList([
             EncoderLayer(embedding_dim=self.hidden_dim,
@@ -166,47 +145,51 @@ class TransformerlcaScore(nn.Module):
         # obs : (b, n_, obs_dim)
         # state : (b,322,bus_dim+pe_dim)
         bs,_,_ = obs.shape
-        # obs_ = obs.transpose(0,1)
+        obs_ = obs.transpose(0,1)
 
-        # obs_ = self.proj_obs(obs).transpose(0,1)
-        # node_ = F.pad(self.proj_node(state),self.padzeros,"constant",0)  # (bs,num_bus+1,hidden_dim)
+        obs_ = self.proj_obs(obs).transpose(0,1)
+        node_ = F.pad(self.proj_node(state),self.padzeros,"constant",0)  # (bs,num_bus+1,hidden_dim)
         
-        # # attentive_bias = th.zeros((bs,self.n_,self.n_)).to("cuda")
-        # nodes_input = node_[:,self.agent_lca_pad.reshape(-1)].reshape(bs,self.n_,self.n_,\
-        #                                                         self.max_lca_len,self.hidden_dim)
+        # attentive_bias = th.zeros((bs,self.n_,self.n_)).to("cuda")
+        nodes_input = node_[:,self.agent_lca_pad.reshape(-1)].reshape(bs,self.n_,self.n_,\
+                                                                self.max_lca_len,self.hidden_dim)
 
-        # agents_permutation = th.tensor(list(permutations([*obs_.tolist(),*obs_.tolist()],2))).to("cuda")
-        # agents_permutation = agents_permutation.reshape(2*self.n_-1, 2*self.n_, 2, bs, self.hidden_dim)
-        # agents_input = agents_permutation[self.n_-1:2*self.n_, :self.n_,:,:,:].permute(3,0,1,2,4)
-        # x = th.cat((agents_input,nodes_input),dim = -2).contiguous()     # x(bs,n_,n_,2+max_lca_len,hidden_dim)
+        agents_permutation = th.tensor(list(permutations([*obs_.tolist(),*obs_.tolist()],2))).to(self.device)
+        agents_permutation = agents_permutation.reshape(2*self.n_,2*self.n_-1, 2, bs, self.hidden_dim)
+        agents_input = agents_permutation[ :self.n_,self.n_-1:2*self.n_-1,:,:,:].permute(3,0,1,2,4)
+        x = th.cat((agents_input,nodes_input),dim = -2).contiguous()     # x(bs,n_,n_,2+max_lca_len,hidden_dim)
         
-        # del agents_permutation,agents_input,nodes_input
-        # gc.collect()
+        del agents_permutation
+        del agents_input
+        del nodes_input
+        gc.collect()
 
-        # for layer in self.attn_layers:
-        #     x = layer(x,mask)
+        for layer in self.attn_layers:
+            x = layer(x,mask)
             
-        # aggre_h = th.cat((x[:,:,:,0,:],x[:,:,:,1,:]),dim=3)    # shape(bs,n_,n_,hidden_dim*2)
-        # attentive_bias = self.out_layer(aggre_h)      
-        bs,_,_ = obs.shape
-        obs = self.proj_obs(obs)
-        state_ = self.proj_node(state)
+        aggre_h = th.cat((x[:,:,:,0,:],x[:,:,:,1,:]),dim=3)    # shape(bs,n_,n_,hidden_dim*2)
+        attentive_bias = self.out_layer(aggre_h).squeeze(3)
+        # 
+        #  
+        # bs,_,_ = obs.shape
+        # obs = self.proj_obs(obs)
+        # state_ = self.proj_node(state)
 
-        attentive_score = th.zeros((bs,self.n_,self.n_)).to(self.device)
-        all_h = th.zeros((self.n_,self.n_,bs,self.hidden_dim*2)).to(self.device)
-        
-        for i in range(self.n_):
-            agent_i_obs = obs[:,i,:]
-            for j in range(self.n_):
-                agent_j_obs = obs[:,j,:].to(self.device)   # (bs,hiddn_dim)
-                lca_nodes = state_[:,self.agent_lca[i][j]].clone().to(self.device)
-                agent_obs_in = th.stack((agent_i_obs,agent_j_obs),dim=1).to(self.device)  # (bs,2,hidden_dim)
-                x = th.cat([agent_obs_in,lca_nodes],dim=1)  # (bs,2_lca_len,hidden_dim)
-                for layer in self.attn_layers:
-                    x = layer(x)
-                aggre_h = th.cat((x[:,0,:],x[:,1,:]),dim=1) # (bs,hidden_dim*2)
-                all_h[i,j] = aggre_h
-        
-        attentive_score = self.out_layer(all_h.permute(2,0,1,3)).squeeze(3)
+        # attentive_score = th.zeros((bs,self.n_,self.n_)).to(self.device)
+        # all_h = th.zeros((self.n_,self.n_,bs,self.hidden_dim*2)).to(self.device)
 
-        return attentive_score
+        # for i in range(self.n_):
+        #     agent_i_obs = obs[:,i,:]
+        #     for j in range(self.n_):
+        #         agent_j_obs = obs[:,j,:].to(self.device)   # (bs,hiddn_dim)
+        #         lca_nodes = state_[:,self.agent_lca[i][j]].clone().to(self.device)
+        #         agent_obs_in = th.stack((agent_i_obs,agent_j_obs),dim=1).to(self.device)  # (bs,2,hidden_dim)
+        #         x = th.cat([agent_obs_in,lca_nodes],dim=1)  # (bs,2_lca_len,hidden_dim)
+        #         for layer in self.attn_layers:
+        #             x = layer(x)
+        #         aggre_h = th.cat((x[:,0,:],x[:,1,:]),dim=1) # (bs,hidden_dim*2)
+        #         all_h[i,j] = aggre_h
+        
+        # attentive_score = self.out_layer(all_h.permute(2,0,1,3)).squeeze(3)
+
+        return attentive_bias
